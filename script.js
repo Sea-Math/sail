@@ -198,6 +198,12 @@
     modal.classList.remove("hidden");
   }
 
+  window.addEventListener("message", (event) => {
+    if (event?.data?.type === "navigate" && typeof event.data.url === "string") {
+      navigate(event.data.url);
+    }
+  });
+
   function wireUi() {
     document.getElementById("address-bar").addEventListener("keydown", (e) => {
       if (e.key === "Enter") navigate();
