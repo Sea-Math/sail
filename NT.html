@@ -273,6 +273,24 @@
     updateDate();
     setInterval(updateDate, 60000);
 
+    const SEARCH_KEY = 'searchEngineUrl';
+    const defaultEngine = 'https://search.brave.com/search?q=';
+
+    function syncEngineSelect() {
+      const saved = localStorage.getItem(SEARCH_KEY);
+      const select = $('#engine');
+      const valid = Array.from(select.options).some((opt) => opt.value === saved);
+      select.value = valid ? saved : defaultEngine;
+      if (!valid) localStorage.setItem(SEARCH_KEY, select.value);
+    }
+
+    syncEngineSelect();
+
+    $('#engine').addEventListener('change', () => {
+      localStorage.setItem(SEARCH_KEY, $('#engine').value);
+      window.parent?.postMessage({ type: 'searchEngineChanged' }, '*');
+    });
+
     $('#searchForm').onsubmit = e => {
       e.preventDefault();
       const q = $('#searchInput').value.trim();
@@ -333,6 +351,10 @@
       'lebron is OUR goat'
     ];
     $('#quote').textContent = quotes[Math.floor(Math.random() * quotes.length)];
+
+    window.addEventListener('storage', (event) => {
+      if (event.key === SEARCH_KEY) syncEngineSelect();
+    });
 
     renderCustom();
   </script>

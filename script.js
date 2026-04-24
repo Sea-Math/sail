@@ -1,17 +1,17 @@
 (() => {
-  const DEFAULT_WISP = "wss://military.marincareers.org/wisp/";
-  const WISP_SERVERS = [
-    { name: "RHW (Default)", url: "wss://military.marincareers.org/wisp/" },
-    { name: "Custom", url: "custom" }
+  const DEFAULT_WISP = "wss://wisp.rhw.one/";
+  const SEARCH_ENGINES = [
+    { name: "Brave", url: "https://search.brave.com/search?q=" },
+    { name: "DuckDuckGo", url: "https://duckduckgo.com/?q=" },
+    { name: "Google", url: "https://www.google.com/search?q=" },
   ];
 
-  const VPN_PROFILES = {
-    japan: { label: "Japan", timezone: "Asia/Tokyo", language: "ja-JP", lat: 35.6762, lon: 139.6503 },
-    california: { label: "California", timezone: "America/Los_Angeles", language: "en-US", lat: 34.0522, lon: -118.2437 },
-    las_vegas: { label: "Las Vegas", timezone: "America/Los_Angeles", language: "en-US", lat: 36.1699, lon: -115.1398 },
-    mexico: { label: "Mexico", timezone: "America/Mexico_City", language: "es-MX", lat: 19.4326, lon: -99.1332 },
-    italy: { label: "Italy", timezone: "Europe/Rome", language: "it-IT", lat: 41.9028, lon: 12.4964 },
-  };
+  const WISP_SERVERS = [
+    { name: "RHW (Default)", url: "wss://wisp.rhw.one/", badge: "Stable" },
+    { name: "Mercury", url: "wss://wisp.mercurywork.shop/", badge: "Fast" },
+    { name: "Wisp 200313", url: "wss://wisp.200313.xyz/", badge: "Backup" },
+    { name: "Custom", url: "custom", badge: "Manual" },
+  ];
 
   let scramjet;
   let connection;
@@ -29,15 +29,19 @@
 
   const getBasePath = () => "/sail/";
   const getActiveWisp = () => storageGet("proxServer") || DEFAULT_WISP;
-  const getActiveVpnKey = () => storageGet("vpnProfile") || "california";
+  const getSearchEngine = () => {
+    const saved = storageGet("searchEngineUrl");
+    return SEARCH_ENGINES.some((e) => e.url === saved) ? saved : SEARCH_ENGINES[0].url;
+  };
 
   const normalizeInput = (value) => {
     const input = (value ?? "").trim();
     if (!input) return "";
+    if (input.toLowerCase() === "seabean://newtab") return "seabean://newtab";
     if (!input.startsWith("http")) {
       return input.includes(".") && !input.includes(" ")
         ? `https://${input}`
-        : `https://search.brave.com/search?q=${encodeURIComponent(input)}`;
+        : `${getSearchEngine()}${encodeURIComponent(input)}`;
     }
     return input;
   };
@@ -55,7 +59,7 @@
             <input id="address-bar" class="bar" placeholder="Search or enter URL" autocomplete="off" />
             <button id="home-btn-nav" title="New tab"><i class="fa-solid fa-house"></i></button>
           </div>
-          <button id="wisp-settings-btn" title="Proxy settings"><i class="fa-solid fa-server"></i></button>
+          <button id="wisp-settings-btn" title="Settings"><i class="fa-solid fa-sliders"></i></button>
         </div>
         <div class="loading-bar-container"><div id="loading-bar" class="loading-bar"></div></div>
         <div class="iframe-container" id="iframe-container">
@@ -79,12 +83,7 @@
   }
 
   async function pushSettingsToServiceWorker() {
-    const payload = {
-      type: "proxySettings",
-      vpnKey: getActiveVpnKey(),
-      vpnProfiles: VPN_PROFILES,
-    };
-
+    const payload = { type: "proxySettings" };
     if (navigator.serviceWorker?.controller) {
       navigator.serviceWorker.controller.postMessage(payload);
     }
@@ -156,7 +155,11 @@
   function updateAddressBar() {
     const tab = getActiveTab();
     const bar = document.getElementById("address-bar");
-    bar.value = tab?.url?.includes("NT.html") ? "" : (tab?.url || "");
+    if (!tab) {
+      bar.value = "";
+      return;
+    }
+    bar.value = tab.isNewTab ? "seabean://newtab" : (tab.url || "");
   }
 
   function switchTab(id) {
@@ -188,7 +191,8 @@
     const tab = {
       id: nextTabId++,
       title: "New Tab",
-      url: `${getBasePath()}NT.html`,
+      url: "seabean://newtab",
+      isNewTab: true,
       frame,
     };
 
@@ -210,7 +214,18 @@
     const normalized = normalizeInput(inputValue ?? document.getElementById("address-bar").value);
     if (!normalized) return;
 
+    if (normalized.toLowerCase() === "seabean://newtab") {
+      tab.url = "seabean://newtab";
+      tab.title = "New Tab";
+      tab.isNewTab = true;
+      tab.frame.src = `${getBasePath()}NT.html`;
+      updateTabsUI();
+      updateAddressBar();
+      return;
+    }
+
     tab.url = normalized;
+    tab.isNewTab = false;
     tab.title = (() => {
       try { return new URL(normalized).hostname; } catch { return "Browsing"; }
     })();
@@ -233,13 +248,14 @@
     const modal = document.getElementById("wisp-settings-modal");
     const list = document.getElementById("server-list");
     const current = getActiveWisp();
-    const selectedVpn = getActiveVpnKey();
+    const engineSelect = document.getElementById("search-engine-select");
 
     list.innerHTML = "";
     WISP_SERVERS.forEach((server) => {
-      const div = document.createElement("div");
+      const div = document.createElement("button");
+      div.type = "button";
       div.className = `wisp-option ${server.url !== "custom" && current === server.url ? "active" : ""}`;
-      div.innerHTML = `<strong>${server.name}</strong><div>${server.url === "custom" ? "Use the input below" : server.url}</div>`;
+      div.innerHTML = `<span class="wisp-main"><strong>${server.name}</strong><small>${server.url === "custom" ? "Use custom input below" : server.url}</small></span><span class="wisp-badge">${server.badge}</span>`;
       div.onclick = async () => {
         if (server.url === "custom") return;
         storageSet("proxServer", server.url);
@@ -249,11 +265,10 @@
       list.appendChild(div);
     });
 
-    const vpnSelect = document.getElementById("vpn-profile-select");
-    vpnSelect.innerHTML = Object.entries(VPN_PROFILES)
-      .map(([key, profile]) => `<option value="${key}">${profile.label}</option>`)
+    engineSelect.innerHTML = SEARCH_ENGINES
+      .map((engine) => `<option value="${engine.url}">${engine.name}</option>`)
       .join("");
-    vpnSelect.value = VPN_PROFILES[selectedVpn] ? selectedVpn : "california";
+    engineSelect.value = getSearchEngine();
 
     modal.classList.remove("hidden");
   }
@@ -261,12 +276,20 @@
   window.addEventListener("message", (event) => {
     if (event?.data?.type === "navigate" && typeof event.data.url === "string") {
       navigate(event.data.url);
+      return;
+    }
+
+    if (event?.data?.type === "searchEngineChanged") {
+      updateAddressBar();
     }
   });
 
   window.addEventListener("storage", async (event) => {
-    if (event.key === "proxServer" || event.key === "vpnProfile") {
+    if (event.key === "proxServer") {
       await applyProxySettings();
+    }
+    if (event.key === "searchEngineUrl") {
+      updateAddressBar();
     }
   });
 
@@ -275,15 +298,7 @@
       if (e.key === "Enter") navigate();
     });
     document.getElementById("reload-btn").onclick = () => getActiveTab()?.frame.contentWindow?.location.reload();
-    document.getElementById("home-btn-nav").onclick = () => {
-      const tab = getActiveTab();
-      if (!tab) return;
-      tab.url = `${getBasePath()}NT.html`;
-      tab.title = "New Tab";
-      tab.frame.src = tab.url;
-      updateTabsUI();
-      updateAddressBar();
-    };
+    document.getElementById("home-btn-nav").onclick = () => navigate("seabean://newtab");
     document.getElementById("back-btn").onclick = () => getActiveTab()?.frame.contentWindow?.history.back();
     document.getElementById("fwd-btn").onclick = () => getActiveTab()?.frame.contentWindow?.history.forward();
     document.getElementById("wisp-settings-btn").onclick = openSettings;
@@ -297,10 +312,10 @@
       openSettings();
     };
 
-    document.getElementById("save-vpn-profile").onclick = async () => {
-      const selected = document.getElementById("vpn-profile-select").value;
-      storageSet("vpnProfile", selected);
-      await applyProxySettings();
+    document.getElementById("save-search-engine").onclick = () => {
+      const selected = document.getElementById("search-engine-select").value;
+      storageSet("searchEngineUrl", selected);
+      updateAddressBar();
       openSettings();
     };
 

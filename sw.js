@@ -143,27 +143,7 @@ async function handleRequest(event) {
   await scramjet.loadConfig();
 
   if (scramjet.route(event)) {
-    const response = await scramjet.fetch(event);
-    const contentType = response.headers.get("content-type") || "";
-
-    if (contentType.includes("text/html")) {
-      const originalText = await response.text();
-      const injectedText = originalText.includes("</head>")
-        ? originalText.replace("</head>", `${buildVpnSpoofScript()}</head>`)
-        : `${buildVpnSpoofScript()}${originalText}`;
-      const encoder = new TextEncoder();
-      const byteLength = encoder.encode(injectedText).length;
-      const newHeaders = new Headers(response.headers);
-      newHeaders.set("content-length", byteLength.toString());
-
-      return new Response(injectedText, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
-      });
-    }
-
-    return response;
+    return scramjet.fetch(event);
   }
 
   return fetch(event.request);
@@ -184,9 +164,6 @@ self.addEventListener("message", ({ data }) => {
     playgroundData = data;
   }
 
-  if (data.type === "proxySettings" && data.vpnKey) {
-    activeVpnKey = data.vpnKey;
-  }
 });
 
 scramjet.addEventListener("request", (e) => {
