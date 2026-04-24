@@ -80,6 +80,21 @@ const CONFIG = {
 /** @type {{ origin: string, html: string, css: string, js: string } | undefined} */
 let playgroundData;
 
+const VPN_PROFILES = {
+  japan: { timezone: "Asia/Tokyo", language: "ja-JP", lat: 35.6762, lon: 139.6503 },
+  california: { timezone: "America/Los_Angeles", language: "en-US", lat: 34.0522, lon: -118.2437 },
+  las_vegas: { timezone: "America/Los_Angeles", language: "en-US", lat: 36.1699, lon: -115.1398 },
+  mexico: { timezone: "America/Mexico_City", language: "es-MX", lat: 19.4326, lon: -99.1332 },
+  italy: { timezone: "Europe/Rome", language: "it-IT", lat: 41.9028, lon: 12.4964 },
+};
+
+let activeVpnKey = "california";
+
+function buildVpnSpoofScript() {
+  const profile = VPN_PROFILES[activeVpnKey] || VPN_PROFILES.california;
+  return `<script>(function(){try{const p=${JSON.stringify(profile)};const tz=p.timezone;const lang=p.language;const lat=p.lat;const lon=p.lon;const ro=Intl.DateTimeFormat.prototype.resolvedOptions;Intl.DateTimeFormat.prototype.resolvedOptions=function(){const out=ro.call(this);out.timeZone=tz;return out;};Object.defineProperty(navigator,'language',{get:()=>lang,configurable:true});Object.defineProperty(navigator,'languages',{get:()=>[lang],configurable:true});if(navigator.geolocation){navigator.geolocation.getCurrentPosition=(success)=>success&&success({coords:{latitude:lat,longitude:lon,accuracy:30}});navigator.geolocation.watchPosition=(success)=>{success&&success({coords:{latitude:lat,longitude:lon,accuracy:30}});return 1;};navigator.geolocation.clearWatch=()=>{};}}catch(e){}})();<\/script>`;
+}
+
 /**
  * @param {string} pattern
  * @returns {RegExp}
