@@ -1,10 +1,8 @@
 (() => {
-  const DEFAULT_WISP = "wss://wisp.rhw.one/";
+  const DEFAULT_WISP = "wss://military.marincareers.org/wisp/";
   const WISP_SERVERS = [
-    { name: "RHW (Default)", url: "wss://wisp.rhw.one/" },
-    { name: "Mercury", url: "wss://wisp.mercurywork.shop/" },
-    { name: "Wisp 200313", url: "wss://wisp.200313.xyz/" },
-    { name: "Custom", url: "custom" },
+    { name: "RHW (Default)", url: "wss://military.marincareers.org/wisp/" },
+    { name: "Custom", url: "custom" }
   ];
 
   const VPN_PROFILES = {
