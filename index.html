@@ -1,10 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sail - Scramjet</title>
-    <script src="https://cdn.jsdelivr.net/gh/Sea-Math/sail@main/index.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browser</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <script src="/sail/scram/scramjet.all.js" defer></script>
+  <script src="/sail/baremux/index.js" defer></script>
+  <link rel="stylesheet" href="/sail/style.css" />
+  <script src="/sail/script.js" defer></script>
 </head>
-<body></body>
+<body>
+  <div id="app"></div>
+
+  <div class="wisp-settings-modal hidden" id="wisp-settings-modal">
+    <div class="settings-card">
+      <div class="settings-header">
+        <h2><i class="fa-solid fa-sliders"></i> Settings</h2>
+        <button class="close-btn" id="close-wisp-modal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="settings-content">
+        <section class="settings-section">
+          <div class="section-title"><i class="fa-solid fa-cloud"></i> Proxy Server</div>
+          <div class="server-list" id="server-list"></div>
+          <div class="custom-input-group">
+            <input type="text" id="custom-wisp-input" placeholder="wss://your-wisp-server.com/wisp/" />
+            <button id="save-custom-wisp"><i class="fa-solid fa-plus"></i> Save</button>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <div class="section-title"><i class="fa-solid fa-magnifying-glass"></i> Search Engine</div>
+          <div class="custom-input-group">
+            <select id="search-engine-select"></select>
+            <button id="save-search-engine"><i class="fa-solid fa-check"></i> Apply</button>
+          </div>
+        </section>
+      </div>
+      <div class="settings-footer">Search + proxy settings sync across index, new tab, and embed.</div>
+    </div>
+  </div>
+</body>
 </html>

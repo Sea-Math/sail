@@ -128,24 +128,7 @@ async function handleRequest(event) {
   await scramjet.loadConfig();
 
   if (scramjet.route(event)) {
-    const response = await scramjet.fetch(event);
-    const contentType = response.headers.get("content-type") || "";
-
-    if (contentType.includes("text/html")) {
-      const originalText = await response.text();
-      const encoder = new TextEncoder();
-      const byteLength = encoder.encode(originalText).length;
-      const newHeaders = new Headers(response.headers);
-      newHeaders.set("content-length", byteLength.toString());
-
-      return new Response(originalText, {
-        status: response.status,
-        statusText: response.statusText,
-        headers: newHeaders,
-      });
-    }
-
-    return response;
+    return scramjet.fetch(event);
   }
 
   return fetch(event.request);
@@ -165,6 +148,7 @@ self.addEventListener("message", ({ data }) => {
   if (data.type === "playgroundData") {
     playgroundData = data;
   }
+
 });
 
 scramjet.addEventListener("request", (e) => {
