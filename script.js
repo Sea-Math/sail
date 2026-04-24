@@ -1,7 +1,23 @@
 (() => {
   const DEFAULT_WISP = "wss://wisp.rhw.one/";
+  const WISP_SERVERS = [
+    { name: "RHW (Default)", url: "wss://wisp.rhw.one/" },
+    { name: "Mercury", url: "wss://wisp.mercurywork.shop/" },
+    { name: "Wisp 200313", url: "wss://wisp.200313.xyz/" },
+    { name: "Custom", url: "custom" },
+  ];
+
+  const VPN_PROFILES = {
+    japan: { label: "Japan", timezone: "Asia/Tokyo", language: "ja-JP", lat: 35.6762, lon: 139.6503 },
+    california: { label: "California", timezone: "America/Los_Angeles", language: "en-US", lat: 34.0522, lon: -118.2437 },
+    las_vegas: { label: "Las Vegas", timezone: "America/Los_Angeles", language: "en-US", lat: 36.1699, lon: -115.1398 },
+    mexico: { label: "Mexico", timezone: "America/Mexico_City", language: "es-MX", lat: 19.4326, lon: -99.1332 },
+    italy: { label: "Italy", timezone: "Europe/Rome", language: "it-IT", lat: 41.9028, lon: 12.4964 },
+  };
 
   let scramjet;
+  let connection;
+  let swRegistration;
   let tabs = [];
   let activeTabId = null;
   let nextTabId = 1;
@@ -14,6 +30,8 @@
   };
 
   const getBasePath = () => "/sail/";
+  const getActiveWisp = () => storageGet("proxServer") || DEFAULT_WISP;
+  const getActiveVpnKey = () => storageGet("vpnProfile") || "california";
 
   const normalizeInput = (value) => {
     const input = (value ?? "").trim();
@@ -62,13 +80,28 @@
       </div>`;
   }
 
+  async function pushSettingsToServiceWorker() {
+    const payload = {
+      type: "proxySettings",
+      vpnKey: getActiveVpnKey(),
+      vpnProfiles: VPN_PROFILES,
+    };
+
+    if (navigator.serviceWorker?.controller) {
+      navigator.serviceWorker.controller.postMessage(payload);
+    }
+    if (swRegistration?.active) {
+      swRegistration.active.postMessage(payload);
+    }
+  }
+
   async function initProxy() {
     if (!("serviceWorker" in navigator)) throw new Error("Service worker unsupported");
-    await navigator.serviceWorker.register(`${getBasePath()}sw.js`, { scope: getBasePath() });
+    swRegistration = await navigator.serviceWorker.register(`${getBasePath()}sw.js`, { scope: getBasePath() });
     await navigator.serviceWorker.ready;
 
-    const connection = new BareMux.BareMuxConnection(`${getBasePath()}baremux/worker.js`);
-    await connection.setTransport(`${getBasePath()}libcurl/index.mjs`, [{ websocket: storageGet("proxServer") || DEFAULT_WISP }]);
+    connection = new BareMux.BareMuxConnection(`${getBasePath()}baremux/worker.js`);
+    await connection.setTransport(`${getBasePath()}libcurl/index.mjs`, [{ websocket: getActiveWisp() }]);
 
     const { ScramjetController } = $scramjetLoadController();
     scramjet = new ScramjetController({
@@ -80,6 +113,7 @@
       },
     });
     await scramjet.init();
+    await pushSettingsToServiceWorker();
   }
 
   const getActiveTab = () => tabs.find((t) => t.id === activeTabId);
@@ -190,17 +224,51 @@
     updateAddressBar();
   }
 
+  async function applyProxySettings() {
+    if (connection) {
+      await connection.setTransport(`${getBasePath()}libcurl/index.mjs`, [{ websocket: getActiveWisp() }]);
+    }
+    await pushSettingsToServiceWorker();
+  }
+
   function openSettings() {
     const modal = document.getElementById("wisp-settings-modal");
     const list = document.getElementById("server-list");
-    const current = storageGet("proxServer") || DEFAULT_WISP;
-    list.innerHTML = `<div class="wisp-option active"><strong>Current</strong><div>${current}</div></div>`;
+    const current = getActiveWisp();
+    const selectedVpn = getActiveVpnKey();
+
+    list.innerHTML = "";
+    WISP_SERVERS.forEach((server) => {
+      const div = document.createElement("div");
+      div.className = `wisp-option ${server.url !== "custom" && current === server.url ? "active" : ""}`;
+      div.innerHTML = `<strong>${server.name}</strong><div>${server.url === "custom" ? "Use the input below" : server.url}</div>`;
+      div.onclick = async () => {
+        if (server.url === "custom") return;
+        storageSet("proxServer", server.url);
+        await applyProxySettings();
+        openSettings();
+      };
+      list.appendChild(div);
+    });
+
+    const vpnSelect = document.getElementById("vpn-profile-select");
+    vpnSelect.innerHTML = Object.entries(VPN_PROFILES)
+      .map(([key, profile]) => `<option value="${key}">${profile.label}</option>`)
+      .join("");
+    vpnSelect.value = VPN_PROFILES[selectedVpn] ? selectedVpn : "california";
+
     modal.classList.remove("hidden");
   }
 
   window.addEventListener("message", (event) => {
     if (event?.data?.type === "navigate" && typeof event.data.url === "string") {
       navigate(event.data.url);
+    }
+  });
+
+  window.addEventListener("storage", async (event) => {
+    if (event.key === "proxServer" || event.key === "vpnProfile") {
+      await applyProxySettings();
     }
   });
 
@@ -223,10 +291,18 @@
     document.getElementById("wisp-settings-btn").onclick = openSettings;
 
     document.getElementById("close-wisp-modal").onclick = () => document.getElementById("wisp-settings-modal").classList.add("hidden");
-    document.getElementById("save-custom-wisp").onclick = () => {
+    document.getElementById("save-custom-wisp").onclick = async () => {
       const val = document.getElementById("custom-wisp-input").value.trim();
       if (!val) return;
       storageSet("proxServer", val);
+      await applyProxySettings();
+      openSettings();
+    };
+
+    document.getElementById("save-vpn-profile").onclick = async () => {
+      const selected = document.getElementById("vpn-profile-select").value;
+      storageSet("vpnProfile", selected);
+      await applyProxySettings();
       openSettings();
     };
 
